@@ -751,6 +751,25 @@ function VoicePage({ theme }) {
   const audioRef = useRef(null);
   const BACKEND_URL = "http://localhost:3001/api/chat";
   const TTS_URL = "http://localhost:3001/api/tts";
+  const HEALTH_URL = "http://localhost:3001/health";
+
+  // Test backend connectivity on mount
+  useEffect(() => {
+    const testBackend = async () => {
+      try {
+        const response = await fetch(HEALTH_URL);
+        const data = await response.json();
+        console.log('[VoicePage] Backend health check:', data);
+        if (!data.apiKeyConfigured) {
+          setError("⚠️ Backend API keys not configured. Check backend .env file.");
+        }
+      } catch (err) {
+        console.error('[VoicePage] Backend connection failed:', err);
+        setError("⚠️ Cannot connect to backend. Make sure it's running on port 3001.");
+      }
+    };
+    testBackend();
+  }, []);
 
   const buildPrompt = (history, userMsg) => {
     const sysPrompt = `You are a helpful, empathetic AI voice agent named "Sam" from VoxEra. You handle customer support queries.
@@ -760,24 +779,45 @@ Never use markdown, bullet points, or special characters in your responses — s
   };
 
   const callAI = async (userText) => {
-    const msgs = [...messages.slice(-6), { role: "user", text: userText }];
-    const apiMessages = msgs.map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
-    const response = await fetch(BACKEND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "claude-3-sonnet-20240229",
-        max_tokens: 200,
-        system: "You are Sam, a helpful AI voice agent for VoxEra. Respond in 1-2 short sentences only, naturally, as if speaking. No markdown.",
-        messages: apiMessages
-      })
-    });
-    if (!response.ok) {
+    try {
+      const msgs = [...messages.slice(-6), { role: "user", text: userText }];
+      const apiMessages = msgs.map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
+      
+      console.log('[Frontend] Sending request to backend:', { messagesCount: apiMessages.length, model: "claude-3-5-sonnet-20241022" });
+      
+      const response = await fetch(BACKEND_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-3-5-sonnet-20241022",
+          max_tokens: 200,
+          system: "You are Sam, a helpful AI voice agent for VoxEra. Respond in 1-2 short sentences only, naturally, as if speaking. No markdown.",
+          messages: apiMessages
+        })
+      });
+      
+      console.log('[Frontend] Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[Frontend] API Error:', errorData);
+        setError(`API Error: ${errorData.details || errorData.error || 'Unknown error'}`);
+        const fallbacks = ["I understand your concern. Let me help you with that right away!", "That's a great question. Based on our knowledge base, I'd be happy to assist.", "I appreciate you reaching out. Our team is committed to resolving this quickly.", "Thank you for that information. Let me pull up your account details."];
+        return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+      }
+      
+      const data = await response.json();
+      console.log('[Frontend] AI Response:', { responseLength: data.content?.[0]?.text?.length });
+      
+      const reply = data.content?.[0]?.text || "I apologize, could you please repeat that?";
+      setError("");
+      return reply;
+    } catch (error) {
+      console.error('[Frontend] Error:', error);
+      setError(`Error: ${error.message}`);
       const fallbacks = ["I understand your concern. Let me help you with that right away!", "That's a great question. Based on our knowledge base, I'd be happy to assist.", "I appreciate you reaching out. Our team is committed to resolving this quickly.", "Thank you for that information. Let me pull up your account details."];
       return fallbacks[Math.floor(Math.random() * fallbacks.length)];
     }
-    const data = await response.json();
-    return data.content?.[0]?.text || "I apologize, could you please repeat that?";
   };
 
   const speakText = async (text) => {
@@ -790,24 +830,38 @@ Never use markdown, bullet points, or special characters in your responses — s
       return;
     }
     try {
+      console.log('[Frontend] Requesting TTS for text:', text.substring(0, 50) + '...');
+      
       const response = await fetch(TTS_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, voice_id: voiceId })
       });
-      if (!response.ok) throw new Error("TTS failed");
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('[Frontend] TTS Error:', errorData);
+        throw new Error(errorData.details || 'TTS failed');
+      }
+      
       const blob = await response.blob();
+      console.log('[Frontend] TTS Response received, blob size:', blob.size);
+      
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;
       setIsSpeaking(true);
       audio.play();
       audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
-    } catch {
+    } catch (error) {
+      console.error('[Frontend] TTS Exception:', error.message);
+      // Fallback to browser TTS
       const utter = new SpeechSynthesisUtterance(text);
       window.speechSynthesis.speak(utter);
       setIsSpeaking(true);
       utter.onend = () => setIsSpeaking(false);
+    }
+  };
     }
   };
 
