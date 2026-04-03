@@ -789,7 +789,7 @@ Never use markdown, bullet points, or special characters in your responses — s
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
+          model: "llama-3.3-70b-versatile",
           max_tokens: 200,
           system: "You are Sam, a helpful, empathetic AI voice agent for VoxEra. You handle customer support queries. Respond concisely in 1-3 sentences for voice conversations. Be warm, professional, and helpful. Never use markdown, bullet points, or special characters in your responses - speak naturally.",
           messages: apiMessages
