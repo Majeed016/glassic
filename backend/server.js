@@ -11,7 +11,7 @@ app.use(express.json());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
+  const hasApiKey = !!process.env.GROQ_API_KEY;
   res.json({ 
     status: 'ok', 
     apiKeyConfigured: hasApiKey,
@@ -19,43 +19,47 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Anthropic API proxy endpoint
+// Groq API proxy endpoint
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, system, model = 'claude-3-5-sonnet-20241022', max_tokens = 200 } = req.body;
+    const { messages, system, model = 'mixtral-8x7b-32768', max_tokens = 200 } = req.body;
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ error: 'GROQ_API_KEY not configured' });
     }
 
     const fetch = (await import('node-fetch')).default;
 
-    console.log('[API Request]', {
+    console.log('[Groq API Request]', {
       model,
       messagesCount: messages?.length,
       hasSystem: !!system,
-      apiKeyPrefix: process.env.ANTHROPIC_API_KEY?.substring(0, 8) + '...'
+      apiKeyPrefix: process.env.GROQ_API_KEY?.substring(0, 8) + '...'
     });
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Add system message to messages array if provided
+    let groqMessages = messages;
+    if (system) {
+      groqMessages = [{ role: 'system', content: system }, ...messages];
+    }
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2024-06-15'
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
       },
       body: JSON.stringify({
         model,
         max_tokens,
-        system,
-        messages
+        messages: groqMessages
       })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      console.error('[Anthropic Error]', {
+      console.error('[Groq Error]', {
         status: response.status,
         statusText: response.statusText,
         error: data
@@ -66,12 +70,20 @@ app.post('/api/chat', async (req, res) => {
       });
     }
 
-    console.log('[API Success]', {
+    console.log('[Groq Success]', {
       status: response.status,
-      responseLength: data.content?.[0]?.text?.length
+      responseLength: data.choices?.[0]?.message?.content?.length
     });
 
-    res.json(data);
+    // Convert Groq response format to Anthropic-like format for frontend compatibility
+    const anthropicFormat = {
+      content: [{
+        type: 'text',
+        text: data.choices?.[0]?.message?.content || ''
+      }]
+    };
+
+    res.json(anthropicFormat);
   } catch (error) {
     console.error('[Backend Error]', error);
     res.status(500).json({ error: 'Failed to process request', details: error.message });
@@ -136,9 +148,10 @@ app.listen(PORT, () => {
 ╔════════════════════════════════════════╗
 ║   🎙️  Backend Server Started           ║
 ║   http://localhost:${PORT}                  ║
+║   Using: Groq API                      ║
 ╚════════════════════════════════════════╝
   `);
-  console.log('✓ Anthropic API Key:', process.env.ANTHROPIC_API_KEY ? '✓ Configured' : '✗ Missing');
+  console.log('✓ Groq API Key:', process.env.GROQ_API_KEY ? '✓ Configured' : '✗ Missing');
   console.log('✓ ElevenLabs API Key:', process.env.ELEVENLABS_API_KEY ? '✓ Configured' : '✗ Missing');
   console.log('\nAvailable endpoints:');
   console.log('  POST /api/chat - Chat with AI');

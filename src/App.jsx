@@ -783,15 +783,15 @@ Never use markdown, bullet points, or special characters in your responses — s
       const msgs = [...messages.slice(-6), { role: "user", text: userText }];
       const apiMessages = msgs.map(m => ({ role: m.role === "agent" ? "assistant" : "user", content: m.text }));
       
-      console.log('[Frontend] Sending request to backend:', { messagesCount: apiMessages.length, model: "claude-3-5-sonnet-20241022" });
+      console.log('[Frontend] Sending request to backend:', { messagesCount: apiMessages.length, model: "mixtral-8x7b-32768" });
       
       const response = await fetch(BACKEND_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-3-5-sonnet-20241022",
+          model: "mixtral-8x7b-32768",
           max_tokens: 200,
-          system: "You are Sam, a helpful AI voice agent for VoxEra. Respond in 1-2 short sentences only, naturally, as if speaking. No markdown.",
+          system: "You are Sam, a helpful, empathetic AI voice agent for VoxEra. You handle customer support queries. Respond concisely in 1-3 sentences for voice conversations. Be warm, professional, and helpful. Never use markdown, bullet points, or special characters in your responses - speak naturally.",
           messages: apiMessages
         })
       });

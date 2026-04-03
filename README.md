@@ -40,13 +40,13 @@ npm run dev
 3. Open http://localhost:5173 in your browser
 
 ### API Keys
-- **Anthropic API Key**: Get from https://console.anthropic.com/
+- **Groq API Key**: Get from https://console.groq.com/
 - **ElevenLabs API Key**: Get from https://elevenlabs.io/
 
 ## Architecture
 - **Frontend**: React with Vite
 - **Backend**: Express.js proxy server
-- **AI**: Anthropic Claude for conversations
+- **AI**: Groq API for conversations
 - **TTS**: ElevenLabs for voice synthesis
 
 ## CORS Fix
