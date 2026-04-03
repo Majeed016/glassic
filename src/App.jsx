@@ -862,8 +862,6 @@ Never use markdown, bullet points, or special characters in your responses — s
       utter.onend = () => setIsSpeaking(false);
     }
   };
-    }
-  };
 
   const stopSpeaking = () => {
     if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
